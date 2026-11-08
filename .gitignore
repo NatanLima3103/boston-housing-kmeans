@@ -1,0 +1,54 @@
+# Ambientes virtuais
+.venv/
+venv/
+env/
+ENV/
+
+# Cache do Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Cache de testes e cobertura
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Empacotamento
+build/
+dist/
+*.egg-info/
+
+# Base de dados: sem confirmação de redistribuição, fica fora do repositório.
+# A pasta é preservada pelo .gitkeep. Veja "Base de dados" no README.
+data/*
+!data/.gitkeep
+
+# Treinamentos experimentais (K diferente de FINAL_K): regeneráveis com --k.
+experiments/
+
+# Credenciais e configuração local
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials*.json
+secrets*.json
+*token*.json
+
+# Logs e arquivos temporários
+*.log
+logs/
+tmp/
+temp/
+*.tmp
+*.bak
+
+# IDE e sistema operacional
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

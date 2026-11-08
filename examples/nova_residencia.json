@@ -1,0 +1,16 @@
+{
+    "identificacao": "Regiao demonstrativa",
+    "CRIM": 0.05,
+    "ZN": 25.0,
+    "INDUS": 5.0,
+    "CHAS": 0,
+    "NOX": 0.45,
+    "RM": 6.5,
+    "AGE": 40.0,
+    "DIS": 5.0,
+    "RAD": 4,
+    "TAX": 250,
+    "PTRATIO": 16.0,
+    "B": 390.0,
+    "LSTAT": 8.0
+}

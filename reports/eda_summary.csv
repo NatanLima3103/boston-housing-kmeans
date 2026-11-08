@@ -1,0 +1,17 @@
+metrica,valor
+registros,506.0
+colunas,14.0
+celulas_ausentes,120.0
+pct_celulas_ausentes,1.694
+registros_com_ausente,112.0
+pct_registros_com_ausente,22.1344
+registros_completos,394.0
+registros_duplicados,0.0
+registros_duplicados_nas_13_caracteristicas,0.0
+registros_com_outlier_iqr_nas_quantitativas,204.0
+registros_com_0_ausentes,394.0
+registros_com_1_ausentes,104.0
+registros_com_2_ausentes,8.0
+CHAS_0,452.0
+CHAS_1,34.0
+CHAS_ausente,20.0
