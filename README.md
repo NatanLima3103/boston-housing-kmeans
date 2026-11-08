@@ -176,11 +176,7 @@ Em CRIM, ZN e B, boa parte dos pontos marcados reflete a forma assimétrica da d
 
 A base foi fornecida para a atividade, e sua inclusão no repositório foi autorizada. Ela fica em `data/HousingData.csv`, de modo que o projeto pode ser treinado logo após o clone. O `.gitignore` versiona apenas esse arquivo e o `data/.gitkeep`; outros arquivos colocados em `data/` ficam fora do Git.
 
-A origem dos dados é o trabalho de 1978, disseminado pelo arquivo StatLib. Para conferir que o arquivo é a mesma versão utilizada no treinamento, compare seu SHA-256:
-
-```text
-7a1eefeaed0bcc17daa972f9e2131b802d0fde5347c5f2ae80af852088dd5f43
-```
+A origem dos dados é o trabalho de 1978, disseminado pelo arquivo StatLib.
 
 Para treinar com outro arquivo, informe o caminho com `--data`.
 
