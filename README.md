@@ -2,6 +2,60 @@
 
 Clusterização de regiões censitárias de Boston com K-Means, com treinamento reproduzível e inferência de novos registros por terminal ou JSON.
 
+> **Requisito: Python 3.12 ou superior.** As versões fixadas em `requirements.txt` exigem Python 3.12 no mínimo (numpy 2.5.4 e scipy 1.18.1). O projeto foi validado com Python 3.12.7 e 3.14.3 no Windows 11.
+
+## Como executar
+
+Na pasta raiz do projeto, crie e ative um ambiente virtual.
+
+```bash
+python -m venv .venv
+```
+
+No Windows (PowerShell):
+
+```bash
+.\.venv\Scripts\Activate.ps1
+```
+
+No Linux ou macOS:
+
+```bash
+source .venv/bin/activate
+```
+
+Instale as dependências:
+
+```bash
+pip install -r requirements.txt
+```
+
+Treine o modelo oficial (K = 3). A base já está em `data/HousingData.csv`.
+
+```bash
+python -m src.train
+```
+
+Classifique uma nova observação digitando os valores no terminal:
+
+```bash
+python -m src.inference
+```
+
+Ou usando o arquivo JSON de exemplo:
+
+```bash
+python -m src.inference --json examples/nova_residencia.json
+```
+
+Para rodar os testes automatizados:
+
+```bash
+pytest -v
+```
+
+Os detalhes de cada comando estão em [Execução](#execução).
+
 ## Objetivo
 
 Identificar perfis de regiões a partir de características estruturais, ambientais, geográficas e socioeconômicas, sem usar o valor dos imóveis (`MEDV`). O projeto tem duas etapas independentes:
@@ -27,30 +81,30 @@ Cada linha da base descreve uma **região censitária**, e não uma residência 
 | joblib | Persistência do modelo |
 | pytest | Testes automatizados |
 
-Ambiente validado: Python 3.14.3 no Windows 11, com as versões fixadas em `requirements.txt`.
+As versões estão fixadas em `requirements.txt`, incluindo o scipy, dependência do scikit-learn, para que o ambiente seja reproduzido sem variação.
 
 ## Estrutura
 
 ```text
 boston-housing-kmeans/
-├── data/                  Base local (fora do Git) e .gitkeep
+├── data/HousingData.csv   Base utilizada no treinamento
 ├── models/                kmeans_model.joblib: pipeline completo e metadados
-├── reports/               Tabelas e gráficos gerados pelo treinamento
+├── reports/               Tabelas e gráficos gerados pelo treinamento oficial
 ├── experiments/           Treinamentos com K experimental (gerado sob demanda, fora do Git)
 ├── src/
-│   ├── config.py          Caminhos, variáveis, hiperparâmetros e K final
+│   ├── config.py          Caminhos, variáveis, hiperparâmetros e K oficial
 │   ├── preprocessing.py   Leitura, validação, pré-processador e desnormalização
 │   ├── eda.py             Análise exploratória
 │   ├── train.py           Seleção de K, treinamento, relatórios e persistência
 │   └── inference.py       Validação da entrada, classificação e apresentação
-├── tests/test_pipeline.py Testes com dados sintéticos e com a base real, se presente
+├── tests/test_pipeline.py Testes com dados sintéticos e com a base real
 ├── examples/nova_residencia.json  Entrada ilustrativa
 ├── requirements.txt
 ├── .gitignore
 └── README.md
 ```
 
-Em relação à estrutura planejada, foram acrescentados `src/eda.py`, para isolar a análise exploratória, e os relatórios `feature_boxplots.png`, `correlation_matrix.csv`, `silhouette_scores.png`, `k_selection.json`, `cluster_analysis.csv` e `feature_influence.csv`.
+A análise exploratória fica isolada em `src/eda.py`, e pode ser executada sem treinar o modelo. Além das tabelas e gráficos básicos, o treinamento gera relatórios de apoio à interpretação: boxplots e matrizes de correlação, Silhouette por K, o registro da escolha de K (`k_selection.json`), a qualidade de cada cluster (`cluster_analysis.csv`) e o peso de cada variável na separação (`feature_influence.csv`).
 
 ## Base de dados
 
@@ -118,15 +172,17 @@ Em CRIM, ZN e B, boa parte dos pontos marcados reflete a forma assimétrica da d
 - `LSTAT` é uma medida socioeconômica sensível, cuja definição original também merece cautela.
 - `B` e `LSTAT` foram mantidas por fazerem parte da definição da base e da metodologia adotada, e não por serem neutras.
 
-### Redistribuição e como obter a base
+### Origem do arquivo
 
-Não foi encontrada licença que confirme a redistribuição deste CSV. A origem é o trabalho de 1978, disseminado pelo arquivo StatLib, e os espelhos públicos trazem informações conflitantes. Por isso, `.gitignore` mantém o arquivo fora do repositório e `data/.gitkeep` preserva a pasta.
+A base foi fornecida para a atividade, e sua inclusão no repositório foi autorizada. Ela fica em `data/HousingData.csv`, de modo que o projeto pode ser treinado logo após o clone. O `.gitignore` versiona apenas esse arquivo e o `data/.gitkeep`; outros arquivos colocados em `data/` ficam fora do Git.
 
-Para reproduzir o treinamento, coloque o arquivo em `data/HousingData.csv` ou informe outro caminho com `--data`. A versão usada aqui tem este SHA-256:
+A origem dos dados é o trabalho de 1978, disseminado pelo arquivo StatLib. Para conferir que o arquivo é a mesma versão utilizada no treinamento, compare seu SHA-256:
 
 ```text
 7a1eefeaed0bcc17daa972f9e2131b802d0fde5347c5f2ae80af852088dd5f43
 ```
+
+Para treinar com outro arquivo, informe o caminho com `--data`.
 
 ## Pré-processamento
 
@@ -151,128 +207,147 @@ As 13 características de entrada geram 14 colunas transformadas: 12 numéricas 
 
 ### Configuração
 
-`KMeans(n_clusters=K, random_state=42, n_init=20, max_iter=300, algorithm="lloyd")`, usada em toda a análise. Duas execuções completas geraram os 18 arquivos de `reports/` e `models/` idênticos byte a byte.
+`KMeans(n_clusters=K, random_state=42, n_init=20, max_iter=300, algorithm="lloyd")`, usada em toda a análise. Treinamentos repetidos com a mesma versão do Python e as versões de `requirements.txt` geram os 18 arquivos de `reports/` e `models/` idênticos byte a byte. Entre Python 3.12 e 3.14, os 17 relatórios continuam idênticos; o arquivo do modelo muda apenas na serialização e no campo `python_version` dos metadados, com centroides, rótulos, inércia e parâmetros do pré-processamento iguais.
 
-Não há divisão treino/teste, pois o objetivo é descrever a estrutura da base completa. Inércia e Silhouette são calculados nos próprios registros de treinamento: avaliam os agrupamentos encontrados, mas não medem, por si sós, a generalização para novos dados. A estabilidade por reamostragem foi incluída para reduzir essa lacuna.
+Não há divisão treino/teste, pois o objetivo é descrever a estrutura da base completa. Inércia, distância média e Silhouette são calculadas nos próprios registros de treinamento: avaliam os agrupamentos encontrados, mas não medem, por si sós, a generalização para novos dados. A estabilidade por reamostragem foi incluída para reduzir essa lacuna.
 
 ### Procedimento de escolha de K
 
-1. **Cotovelo geométrico:** K e inércia são normalizados para [0, 1], traça-se a reta entre os pontos extremos da curva e escolhe-se o ponto de maior distância perpendicular a ela.
-2. **Silhouette (K de 2 a 10):** compara a coesão interna com a separação entre grupos. K = 1 não tem Silhouette.
-3. **Distribuição:** nenhum cluster pode ficar abaixo de 5% dos registros.
-4. **Estabilidade:** ARI médio e percentil 5 entre a partição de referência e 50 modelos treinados em reamostragens.
-5. **Interpretabilidade:** avaliada na análise abaixo, por não ser calculável.
+O **método do cotovelo é o critério principal** do K oficial. Ele é aplicado a duas medidas de distância entre os registros e os centroides, calculadas para K de 1 a 10:
 
-A regra automática de `select_k` adota o cotovelo geométrico se ele respeitar o tamanho mínimo; caso contrário, o maior Silhouette entre os K que o respeitam. Nesta base, ela indica K = 3. A decisão final do responsável pelo projeto é **K = 2**, definida em `FINAL_K` (`src/config.py`). O arquivo `reports/k_selection.json` registra as duas informações.
+- **Inércia:** soma dos quadrados das distâncias euclidianas de cada registro ao seu centroide, no espaço transformado de 14 colunas.
+- **Distância média:** média dessas mesmas distâncias, sem elevar ao quadrado.
+
+O cotovelo de cada curva é localizado geometricamente: K e a medida são normalizados para [0, 1], traça-se a reta entre os pontos extremos (K = 1 e K = 10) e escolhe-se o ponto de maior distância perpendicular a ela. Esse é o ponto em que a curva deixa de cair rapidamente e passa a cair devagar.
+
+As demais medidas são complementares e não definem o K oficial:
+
+1. **Silhouette (K de 2 a 10):** compara a coesão interna com a separação entre grupos. K = 1 não tem Silhouette.
+2. **Distribuição:** nenhum cluster pode ficar abaixo de 5% dos registros. Se o cotovelo violasse essa condição, a regra automática passaria para o maior Silhouette entre os K que a respeitam.
+3. **Estabilidade:** ARI médio e percentil 5 entre a partição de referência e 50 modelos treinados em reamostragens.
+
+O K oficial fica fixado em `FINAL_K` (`src/config.py`). O arquivo `reports/k_selection.json` registra o cotovelo pelas duas medidas, o K de maior Silhouette e a sensibilidade do cotovelo à faixa de K avaliada.
 
 ![Método do cotovelo](reports/elbow_method.png)
 
-| K | Inércia | Redução vs. K anterior (%) | Inércia explicada (%) | Distância ao segmento | Silhouette | Tamanhos | ARI médio | ARI p5 |
-|---:|---:|---:|---:|---:|---:|---|---:|---:|
-| 1 | 6135,43 | – | 0,00 | 0,0000 | – | 506 | – | – |
-| **2** | **3804,50** | **37,99** | **37,99** | **0,2797** | **0,3714** | **330, 176** | **0,966** | **0,937** |
-| 3 | 3140,37 | 17,46 | 48,82 | 0,3031 | 0,2815 | 258, 167, 81 | 0,778 | 0,405 |
-| 4 | 2768,72 | 11,83 | 54,87 | 0,2817 | 0,2711 | 237, 132, 79, 58 | 0,682 | 0,497 |
-| 5 | 2447,41 | 11,61 | 60,11 | 0,2525 | 0,2538 | 184, 130, 100, 55, 37 | 0,613 | 0,436 |
-| 6 | 2173,97 | 11,17 | 64,57 | 0,2160 | 0,2610 | 163, 110, 100, 55, 41, 37 | 0,738 | 0,495 |
-| 7 | 1968,69 | 9,44 | 67,91 | 0,1689 | 0,2767 | 124, 110, 100, 56, 53, 37, 26 | 0,795 | 0,556 |
-| 8 | 1776,45 | 9,77 | 71,05 | 0,1199 | 0,2848 | 121, 113, 98, 57, 53, 32, 25, 7 | 0,854 | 0,744 |
-| 9 | 1647,27 | 7,27 | 73,15 | 0,0612 | 0,2846 | 110, 107, 93, 54, 53, 30, 25, 25, 9 | 0,881 | 0,721 |
-| 10 | 1534,29 | 6,86 | 74,99 | 0,0000 | 0,2795 | 114, 109, 74, 53, 47, 31, 26, 25, 22, 5 | 0,868 | 0,695 |
+| K | Inércia | Redução vs. K anterior (%) | Inércia explicada (%) | Distância ao segmento (inércia) | Distância média ao centroide | Distância ao segmento (dist. média) | Silhouette | Tamanhos | ARI médio | ARI p5 |
+|---:|---:|---:|---:|---:|---:|---:|---:|---|---:|---:|
+| 1 | 6135,43 | – | 0,00 | 0,0000 | 3,2493 | 0,0000 | – | 506 | – | – |
+| 2 | 3804,50 | 37,99 | 37,99 | 0,2797 | 2,5409 | 0,2321 | 0,3714 | 330, 176 | 0,966 | 0,937 |
+| **3** | **3140,37** | **17,46** | **48,82** | **0,3031** | **2,2856** | **0,2656** | **0,2815** | **258, 167, 81** | **0,778** | **0,405** |
+| 4 | 2768,72 | 11,83 | 54,87 | 0,2817 | 2,1621 | 0,2411 | 0,2711 | 237, 132, 79, 58 | 0,682 | 0,497 |
+| 5 | 2447,41 | 11,61 | 60,11 | 0,2525 | 2,0163 | 0,2265 | 0,2538 | 184, 130, 100, 55, 37 | 0,613 | 0,436 |
+| 6 | 2173,97 | 11,17 | 64,57 | 0,2160 | 1,9033 | 0,1975 | 0,2610 | 163, 110, 100, 55, 41, 37 | 0,738 | 0,495 |
+| 7 | 1968,69 | 9,44 | 67,91 | 0,1689 | 1,8112 | 0,1593 | 0,2767 | 124, 110, 100, 56, 53, 37, 26 | 0,795 | 0,556 |
+| 8 | 1776,45 | 9,77 | 71,05 | 0,1199 | 1,7553 | 0,1053 | 0,2848 | 121, 113, 98, 57, 53, 32, 25, 7 | 0,854 | 0,744 |
+| 9 | 1647,27 | 7,27 | 73,15 | 0,0612 | 1,6851 | 0,0575 | 0,2846 | 110, 107, 93, 54, 53, 30, 25, 25, 9 | 0,881 | 0,721 |
+| 10 | 1534,29 | 6,86 | 74,99 | 0,0000 | 1,6371 | 0,0000 | 0,2795 | 114, 109, 74, 53, 47, 31, 26, 25, 22, 5 | 0,868 | 0,695 |
 
 ## Resultados
 
-### K selecionado: 2
+### K oficial: 3
 
-| Métrica do modelo definitivo | Valor |
+O maior afastamento em relação à reta ocorre em K = 3 nas duas curvas: 0,3031 na inércia e 0,2656 na distância média. A partir de K = 3, cada cluster adicional reduz a inércia em no máximo 11,83%, contra 37,99% e 17,46% nos dois primeiros acréscimos. O menor cluster tem 16,01% dos registros, acima do mínimo de 5%. K = 3 é, portanto, o resultado do método do cotovelo, adotado como modelo oficial.
+
+| Métrica do modelo oficial | Valor |
 |---|---|
-| Inércia | 3804,4977 |
-| Silhouette | 0,3714 |
-| Inércia explicada | 37,99% |
-| Iterações até a convergência | 8 |
+| Inércia | 3140,3738 |
+| Distância média ao centroide | 2,2856 |
+| Inércia explicada em relação a K = 1 | 48,82% |
+| Silhouette | 0,2815 |
+| Iterações até a convergência | 5 |
 
-### Comparação entre K = 2 e K = 3
+### Cuidados na leitura do cotovelo
 
-K = 3 foi o candidato indicado pelo método geométrico na faixa de 1 a 10. K = 2 foi escolhido considerando a ambiguidade do cotovelo, o Silhouette Score e a estabilidade dos agrupamentos. Os valores de K = 3 vêm da mesma análise e foram mantidos sem alteração em `reports/elbow_results.csv`.
+O cotovelo de K = 3 não é inequívoco, e os resultados que não o favorecem estão registrados a seguir:
 
-| Critério | K = 2 (adotado) | K = 3 (candidato geométrico) |
+- **Margem pequena:** na inércia, a distância ao segmento em K = 3 (0,3031) é pouco maior que em K = 4 (0,2817) e K = 2 (0,2797).
+- **Dependência da faixa avaliada:** pela inércia, o cotovelo é 2 nas faixas 1–6 e 1–7, 3 nas faixas 1–8, 1–9 e 1–10, e 5 na faixa 2–10. Pela distância média, é 3 em todas as faixas que começam em K = 1, exceto 1–6, em que é 2. O K oficial usa a faixa completa de 1 a 10, definida em `K_MIN` e `K_MAX`.
+- **Outros critérios de curvatura:** a maior queda absoluta da inércia ocorre de K = 1 para K = 2 (37,99%), e o critério da maior segunda diferença aponta K = 2. O projeto adota o critério geométrico, que é o implementado em `find_elbow`.
+
+### Comparação entre K = 3 e K = 2
+
+K = 2 é mantido como comparação. Ele pode ser treinado sem alterar o modelo oficial (veja [Treinamentos experimentais](#treinamentos-experimentais)).
+
+| Critério | K = 3 (oficial) | K = 2 (comparação) |
 |---|---:|---:|
-| Distância ao segmento | 0,2797 | 0,3031 |
-| Inércia | 3804,50 | 3140,37 |
-| Inércia explicada | 37,99% | 48,82% |
-| Silhouette | 0,3714 | 0,2815 |
-| ARI médio | 0,966 | 0,778 |
-| ARI p5 | 0,937 | 0,405 |
-| Tamanhos | 330, 176 | 258, 167, 81 |
-| Menor cluster | 34,78% | 16,01% |
+| Distância ao segmento (inércia) | 0,3031 | 0,2797 |
+| Distância ao segmento (dist. média) | 0,2656 | 0,2321 |
+| Inércia | 3140,37 | 3804,50 |
+| Distância média ao centroide | 2,2856 | 2,5409 |
+| Inércia explicada | 48,82% | 37,99% |
+| Silhouette | 0,2815 | 0,3714 |
+| ARI médio | 0,778 | 0,966 |
+| ARI p5 | 0,405 | 0,937 |
+| Tamanhos | 258, 167, 81 | 330, 176 |
+| Menor cluster | 16,01% | 34,78% |
 
-**Por que K = 2:**
+**O que K = 3 acrescenta:** K = 2 junta em um único grupo heterogêneo de 330 registros as regiões intermediárias e as de baixa densidade com zoneamento residencial. K = 3 separa esse perfil em um cluster próprio de 81 registros, todos com ZN > 0. A comparação direta das partições mostra que o Cluster 2 de K = 3 está inteiramente dentro do Cluster 0 de K = 2, e que o Cluster 1 de K = 3 corresponde ao Cluster 1 de K = 2, menos 9 registros.
 
-- **Cotovelo ambíguo:** a distância em K = 3 (0,3031) é pouco maior que em K = 4 (0,2817) e K = 2 (0,2797). O candidato também muda com a faixa avaliada: é 2 nas faixas 1–6 e 1–7, 3 nas faixas 1–8, 1–9 e 1–10, e 5 na faixa 2–10. Além disso, a maior queda de inércia ocorre de K = 1 para K = 2 (37,99%).
-- **Silhouette superior:** 0,3714 é o maior valor entre todos os K avaliados, contra 0,2815 em K = 3.
-- **Estabilidade superior:** o ARI médio é 0,966 em K = 2, contra 0,778 em K = 3. O percentil 5 cai de 0,937 para 0,405, o que mostra instabilidade relevante de K = 3. A solução de K = 3 é a mesma em 15 sementes na base completa, então não se trata de mínimo local. Em verificação pontual, porém, parte das reamostragens produziu outra partição, com grupos próximos de 205, 165 e 134 registros.
+**O que as métricas complementares mostram:**
 
-**O que se perde com K = 2:**
+- **Silhouette:** K = 2 tem o maior valor entre todos os K avaliados (0,3714). K = 3 fica em quarto lugar (0,2815), o que indica grupos menos separados.
+- **Estabilidade:** o ARI médio cai de 0,966 em K = 2 para 0,778 em K = 3, e o percentil 5 cai de 0,937 para 0,405. Em parte das reamostragens, K = 3 produz uma partição diferente. Na base completa, porém, a solução de K = 3 é a mesma em 15 sementes de inicialização, então não se trata de um mínimo local do algoritmo.
 
-- O modelo explica menos inércia: 37,99% contra 48,82%.
-- O perfil de baixa densidade e alto zoneamento residencial, que formava um grupo de 81 registros em K = 3, fica misturado no Cluster 0. Por isso, o centroide desse cluster representa um grupo heterogêneo.
-
-Para examinar a alternativa, execute `python -m src.train --k 3`. Os resultados vão para `experiments/k3/`, sem alterar o modelo e os relatórios oficiais de K = 2. Veja [Treinamentos experimentais](#treinamentos-experimentais).
+Essas métricas não alteram a escolha, pois o critério definido para o K oficial é o cotovelo, mas indicam que a divisão em três grupos deve ser lida com cautela, principalmente na fronteira entre os Clusters 0 e 1.
 
 ### Distribuição
 
 | Cluster | Registros | % |
 |---:|---:|---:|
-| 0 | 330 | 65,22 |
-| 1 | 176 | 34,78 |
+| 0 | 258 | 50,99 |
+| 1 | 167 | 33,00 |
+| 2 | 81 | 16,01 |
 
 ![Distribuição dos clusters](reports/cluster_distribution.png)
 
-Os grupos têm tamanhos diferentes, sem balanceamento artificial, e nenhum é muito pequeno.
+Os grupos têm tamanhos diferentes, sem balanceamento artificial, e nenhum fica abaixo de 5% dos registros.
 
 ### Centroides na escala original
 
 Os valores são médias dos registros de cada cluster, incluindo os imputados. São perfis médios encontrados pelo algoritmo, e não regiões reais.
 
-| Variável | Cluster 0 | Cluster 1 |
-|---|---:|---:|
-| CRIM | 0,2633 | 9,5089 |
-| ZN | 16,5121 | 0,0000 |
-| INDUS | 7,0008 | 18,5815 |
-| NOX | 0,4873 | 0,6811 |
-| RM | 6,4536 | 5,9678 |
-| AGE | 57,2967 | 90,5006 |
-| DIS | 4,7483 | 2,0076 |
-| RAD (média do índice) | 4,4636 | 19,0852 |
-| TAX | 301,5727 | 608,2330 |
-| PTRATIO | 17,8412 | 19,6074 |
-| B | 386,3990 | 300,9398 |
-| LSTAT | 9,6696 | 18,2803 |
-| CHAS: categoria 0 | 93,03% | 93,75% |
-| CHAS: categoria 1 | 6,97% | 6,25% |
-| CHAS: predominante | 0 | 0 |
-| RAD mais frequente nos registros (complementar) | 5 (28,48%) | 24 (75,00%) |
+| Variável | Cluster 0 | Cluster 1 | Cluster 2 |
+|---|---:|---:|---:|
+| CRIM | 0,3560 | 9,9528 | 0,0799 |
+| ZN | 3,5891 | 0,0000 | 55,8395 |
+| INDUS | 8,4886 | 18,4779 | 3,7623 |
+| NOX | 0,5114 | 0,6855 | 0,4228 |
+| RM | 6,3368 | 5,9701 | 6,7669 |
+| AGE | 66,4159 | 90,4611 | 32,0210 |
+| DIS | 3,9924 | 1,9964 | 6,8748 |
+| RAD (média do índice) | 4,5349 | 19,9042 | 4,1728 |
+| TAX | 302,1357 | 622,9521 | 303,5062 |
+| PTRATIO | 18,1178 | 19,7539 | 16,8543 |
+| B | 383,2566 | 299,7286 | 389,4096 |
+| LSTAT | 10,9418 | 18,4432 | 6,2381 |
+| CHAS: categoria 0 | 93,02% | 93,41% | 93,83% |
+| CHAS: categoria 1 | 6,98% | 6,59% | 6,17% |
+| CHAS: predominante | 0 | 0 | 0 |
+| RAD mais frequente nos registros (complementar) | 5 (31,78%) | 24 (79,04%) | 4 (27,16%) |
 
 ### Características dos grupos
 
-Os números dos clusters são apenas identificadores: Cluster 0 não é melhor nem pior que Cluster 1.
+Os números dos clusters são apenas identificadores: nenhum cluster é melhor ou pior que outro.
 
-- **Cluster 0, menor densidade:** concentra as regiões com zoneamento residencial, com menores CRIM, INDUS, NOX, TAX e LSTAT e maior DIS. É heterogêneo, pois reúne perfis intermediários e de baixa densidade.
-- **Cluster 1, alta densidade e bloco RAD = 24:** maiores CRIM, INDUS, NOX, AGE, TAX e LSTAT, menor DIS e nenhum zoneamento para lotes grandes. Reúne os 132 registros da base com RAD = 24 e outros 44 registros.
+- **Cluster 0, perfil intermediário (258 registros):** valores próximos do meio da base em quase todas as variáveis, com CRIM baixo (0,36), INDUS e NOX moderados e pouco zoneamento residencial (só 45 dos 258 registros têm ZN > 0).
+- **Cluster 1, alta densidade e bloco RAD = 24 (167 registros):** maiores CRIM, INDUS, NOX, AGE, TAX e LSTAT, menor DIS e nenhum zoneamento para lotes grandes. Reúne os 132 registros da base com RAD = 24 e outros 35 registros.
+- **Cluster 2, baixa densidade e zoneamento residencial (81 registros):** todos os registros têm ZN > 0 (média de 55,84), com os menores CRIM, INDUS, NOX, AGE e LSTAT, a maior DIS e o maior número médio de cômodos.
 
 ### Análise crítica
 
 | Cluster | Distância média | Distância p95 | Distância máxima | Silhouette médio | Silhouette negativos |
 |---:|---:|---:|---:|---:|---:|
-| 0 | 2,4029 | 4,2102 | 5,0427 | 0,4064 | 0 |
-| 1 | 2,7996 | 4,4960 | 9,4822 | 0,3056 | 8 |
+| 0 | 2,0883 | 3,5514 | 4,6593 | 0,2741 | 7 |
+| 1 | 2,7493 | 4,5415 | 9,4234 | 0,2670 | 9 |
+| 2 | 1,9577 | 2,9976 | 3,5610 | 0,3350 | 0 |
 
-- **Coesão:** o Silhouette geral de 0,3714 é o melhor entre os K avaliados, mas ainda é moderado. O Cluster 0 é mais coeso que o Cluster 1, que concentra os 8 registros com Silhouette negativo, mais próximos do outro grupo.
-- **Valores extremos:** o Cluster 1 é o mais disperso, e sua distância máxima de 9,48 pertence ao registro de maior CRIM (88,98). A padronização reduz o domínio das escalas, mas não elimina a influência de extremos.
-- **Peso das variáveis:** TAX (16,34%), INDUS (14,72%), RAD (13,91%) e NOX (13,80%) concentram a separação entre grupos em `reports/feature_influence.csv`. ZN responde por apenas 2,54%, o que confirma que o zoneamento residencial pouco distingue os dois grupos.
-- **Dependência do bloco RAD/TAX:** a divisão se apoia fortemente nesse bloco. Como RAD é tratada numericamente, o salto de 8 para 24 reforça a separação, de modo que parte dela decorre dessa decisão de modelagem.
-- **CHAS quase não contribui:** responde por 0,0005% da separação, e os dois clusters têm composição praticamente igual. A proximidade com o rio não caracteriza nenhum grupo.
-- **MEDV a posteriori:** as médias foram 25,72 no Cluster 0 e 16,55 no Cluster 1. Os grupos diferem em valor sem que MEDV tenha participado do treinamento, mas essa comparação é descritiva e ocorreu depois da escolha de K.
+- **Coesão:** o Silhouette geral de 0,2815 é moderado. O Cluster 2 é o mais coeso e não tem nenhum registro com Silhouette negativo. Os Clusters 0 e 1 concentram os 16 registros com Silhouette negativo, que estão mais próximos de outro grupo do que do próprio.
+- **Valores extremos:** o Cluster 1 é o mais disperso, e sua distância máxima de 9,42 pertence ao registro de maior CRIM (88,98). A padronização reduz o domínio das escalas, mas não elimina a influência de extremos.
+- **Peso das variáveis:** TAX (13,54%), ZN (12,44%), NOX (11,83%), RAD (11,80%) e INDUS (11,32%) concentram a separação entre grupos em `reports/feature_influence.csv`. O peso de ZN, que era pequeno com dois grupos, vem justamente do Cluster 2.
+- **Dependência do bloco RAD/TAX:** a separação do Cluster 1 se apoia fortemente nesse bloco. Como RAD é tratada numericamente, o salto de 8 para 24 reforça a separação, de modo que parte dela decorre dessa decisão de modelagem.
+- **CHAS quase não contribui:** responde por 0,0003% da separação, e os três clusters têm composição praticamente igual. A proximidade com o rio não caracteriza nenhum grupo.
+- **MEDV a posteriori:** as médias foram 24,30 no Cluster 0, 16,35 no Cluster 1 e 29,65 no Cluster 2. Os grupos diferem em valor sem que MEDV tenha participado do treinamento, mas essa comparação é descritiva e ocorreu depois da escolha de K.
 
 ## Inferência
 
@@ -287,7 +362,7 @@ Os números dos clusters são apenas identificadores: Cluster 0 não é melhor n
 
 O `ColumnTransformer` não oferece `inverse_transform`, então `denormalize_centroids` reconstrói cada bloco de forma explícita:
 
-- **Quantitativas:** usa `StandardScaler.inverse_transform` nas colunas numéricas do centroide. O resultado é a média do cluster. Por isso, RAD pode ser decimal, e essa média não é arredondada nem tratada como categoria.
+- **Quantitativas:** usa `StandardScaler.inverse_transform` nas colunas numéricas do centroide. O resultado é a média do cluster. Por isso, RAD pode ser decimal, e essa média não é arredondada nem tratada como categoria. Resíduos de ponto flutuante, como −1e-14 em ZN, são eliminados para não aparecerem como "-0.0000".
 - **CHAS:** as colunas One-Hot do centroide já são proporções das categorias no cluster, considerando a imputação. As categorias vêm do `OneHotEncoder` ajustado, e a predominante é a de maior proporção. CHAS não é interpretada como variável contínua.
 
 ### Regras de validação
@@ -299,12 +374,14 @@ O `ColumnTransformer` não oferece `inverse_transform`, então `denormalize_cent
 | CHAS diferente de 0 ou 1 | Erro |
 | Valor negativo, ou percentual (ZN, INDUS, AGE, LSTAT) acima de 100 | Erro, por contrariar a definição da variável |
 | JSON inválido ou com campos duplicados | Erro |
-| Modelo inexistente, corrompido ou com estrutura inesperada | Erro, com orientação |
+| Modelo inexistente, corrompido ou com estrutura inesperada | Erro, com orientação para verificar o arquivo ou treinar novamente |
 | Campo presente com `null` | Aceito: imputado com o valor do treinamento e informado em aviso |
 | Valor fora do intervalo do treinamento, ou RAD não observado | Aceito, com aviso informativo |
 | Versão do scikit-learn diferente da usada no treinamento | Aceito, com aviso |
 
 ## Execução
+
+Todos os comandos são executados na pasta raiz do projeto, com o ambiente virtual ativado.
 
 ### Instalação
 
@@ -315,7 +392,7 @@ python -m venv .venv
 Ativação no Windows (PowerShell):
 
 ```bash
-.venv\Scripts\Activate.ps1
+.\.venv\Scripts\Activate.ps1
 ```
 
 Ativação no Linux/macOS:
@@ -330,11 +407,11 @@ Instalação das dependências:
 pip install -r requirements.txt
 ```
 
-As versões fixadas foram validadas com Python 3.14. Versões mais antigas do Python podem não atender a elas.
+Se houver mais de uma versão do Python instalada, crie o ambiente com uma versão 3.12 ou superior, por exemplo `py -3.12 -m venv .venv` no Windows.
 
 ### Treinamento
 
-Requer a base em `data/HousingData.csv` e leva cerca de um minuto e meio, em razão da análise de estabilidade.
+Usa a base em `data/HousingData.csv` e grava o modelo em `models/` e os relatórios em `reports/`. O tempo de execução depende do hardware e do ambiente, principalmente por causa da análise de estabilidade, e pode chegar a 1 ou 2 minutos em máquinas mais modestas.
 
 ```bash
 python -m src.train
@@ -346,31 +423,31 @@ Com outra base:
 python -m src.train --data caminho/para/HousingData.csv
 ```
 
-K = 2 é o padrão, definido em `FINAL_K` (`src/config.py`). Este comando é equivalente a `python -m src.train` e gera os mesmos arquivos:
+K = 3 é o padrão, definido em `FINAL_K` (`src/config.py`). Este comando é equivalente a `python -m src.train` e gera os mesmos arquivos:
 
 ```bash
-python -m src.train --k 2
+python -m src.train --k 3
 ```
 
 `--k` é validado antes de qualquer processamento: aceita inteiros de 2 a 10 (`K_MAX`), que é a faixa em que o Silhouette é avaliado. Fora dela, como em `--k 1`, o comando termina imediatamente com código 2, sem análise nem gravação de arquivos.
 
 #### Treinamentos experimentais
 
-Um K diferente de `FINAL_K` é tratado como experimento e nunca grava em `models/` ou `reports/`:
+Um K diferente de `FINAL_K` é tratado como experimento e nunca grava em `models/` ou `reports/`. Para treinar a comparação com K = 2:
 
 ```bash
-python -m src.train --k 3
+python -m src.train --k 2
 ```
 
 | Execução | Modelo | Relatórios |
 |---|---|---|
-| `python -m src.train` ou `--k 2` (oficial) | `models/kmeans_model.joblib` | `reports/` |
-| `--k 3` (experimental) | `experiments/k3/kmeans_model.joblib` | `experiments/k3/reports/` |
+| `python -m src.train` ou `--k 3` (oficial) | `models/kmeans_model.joblib` | `reports/` |
+| `--k 2` (experimental) | `experiments/k2/kmeans_model.joblib` | `experiments/k2/reports/` |
 
 A pasta `experiments/` é criada sob demanda, pode ser apagada a qualquer momento e fica fora do Git. Para classificar uma observação com um modelo experimental, use `--model`:
 
 ```bash
-python -m src.inference --json examples/nova_residencia.json --model experiments/k3/kmeans_model.joblib
+python -m src.inference --json examples/nova_residencia.json --model experiments/k2/kmeans_model.joblib
 ```
 
 Somente a análise exploratória:
@@ -385,7 +462,7 @@ python -m src.eda
 python -m src.inference
 ```
 
-O sistema solicita a identificação e as 13 características. Decimais aceitam ponto ou vírgula, e `null` indica valor desconhecido.
+O sistema solicita a identificação e as 13 características. Decimais aceitam ponto ou vírgula, e `null` indica valor desconhecido, que é imputado pelo modelo com aviso.
 
 ### Inferência por JSON
 
@@ -393,7 +470,7 @@ O sistema solicita a identificação e as 13 características. Decimais aceitam 
 python -m src.inference --json examples/nova_residencia.json
 ```
 
-Os valores de `examples/nova_residencia.json` são ilustrativos e não representam uma observação real. Saída obtida com o modelo treinado:
+Os valores de `examples/nova_residencia.json` são ilustrativos e não representam uma observação real. Saída obtida com o modelo oficial:
 
 ```text
 ==============================================
@@ -402,45 +479,47 @@ Os valores de `examples/nova_residencia.json` são ilustrativos e não represent
 
 Identificação: Regiao demonstrativa
 
-Cluster atribuído: 0
+Cluster atribuído: 2
 (O número identifica o grupo; não indica qualidade)
 
-Distância até o centroide: 1.2785
+Distância até o centroide: 1.7995
 (Espaço normalizado e codificado)
-Referência do cluster no treinamento: média 2.4029, p95 4.2102
+Referência do cluster no treinamento: média 1.9577, p95 2.9976
 
 ----------------------------------------------
 CENTROIDE NA ESCALA ORIGINAL
 ----------------------------------------------
 (Perfil médio do cluster, não uma região real)
 
-CRIM:       0.2633
-ZN:         16.5121
-INDUS:      7.0008
-NOX:        0.4873
-RM:         6.4536
-AGE:        57.2967
-DIS:        4.7483
-RAD:        4.4636
-TAX:        301.5727
-PTRATIO:    17.8412
-B:          386.3990
-LSTAT:      9.6696
+CRIM:       0.0799
+ZN:         55.8395
+INDUS:      3.7623
+NOX:        0.4228
+RM:         6.7669
+AGE:        32.0210
+DIS:        6.8748
+RAD:        4.1728
+TAX:        303.5062
+PTRATIO:    16.8543
+B:          389.4096
+LSTAT:      6.2381
 
 CHAS:
 
-Categoria 0: 93.03%
-Categoria 1: 6.97%
+Categoria 0: 93.83%
+Categoria 1: 6.17%
 
-Categoria predominante: 0 (93.03%)
+Categoria predominante: 0 (93.83%)
 
 ----------------------------------------------
 ESTATÍSTICA COMPLEMENTAR (NÃO FAZ PARTE DO CENTROIDE)
 ----------------------------------------------
-RAD mais frequente nos registros reais do cluster: 5 (28.48%)
+RAD mais frequente nos registros reais do cluster: 4 (27.16%)
 
 ==============================================
 ```
+
+O exemplo tem ZN = 25, baixa criminalidade e baixa densidade industrial, e por isso é atribuído ao Cluster 2, de baixa densidade e zoneamento residencial.
 
 ### Testes
 
@@ -448,7 +527,7 @@ RAD mais frequente nos registros reais do cluster: 5 (28.48%)
 pytest -v
 ```
 
-Os testes usam dados sintéticos e não dependem da base real. Os dois testes que a utilizam são ignorados se o CSV não estiver em `data/`.
+A maior parte dos testes usa dados sintéticos e não depende da base real. Os três testes que a utilizam conferem a versão do arquivo, confirmam que `FINAL_K` é o cotovelo da base e treinam o pipeline completo; eles são ignorados se o CSV não estiver em `data/`.
 
 ## Artefato do modelo
 
@@ -458,35 +537,3 @@ Os testes usam dados sintéticos e não dependem da base real. Os dois testes qu
 - `metadata`: variáveis, configuração, K, métricas, intervalos do treinamento, organização dos centroides e versões de Python e bibliotecas.
 
 O artefato guarda estatísticas agregadas e o rótulo de cluster de cada registro, mas não os valores da base. Ele deve ser usado com as versões de `requirements.txt`. Como Joblib usa pickle, carregue apenas arquivos de origem confiável.
-
-## Publicação
-
-O diretório está pronto para virar um repositório independente, mas nenhuma operação de Git foi executada. A publicação é manual e deve ocorrer após a revisão, dentro da pasta do projeto:
-
-```bash
-git init -b main
-```
-
-```bash
-git add .
-```
-
-```bash
-git status
-```
-
-Confira que `data/HousingData.csv` e `.venv/` não aparecem na lista.
-
-```bash
-git commit -m "Projeto de clusterização K-Means da base Boston Housing"
-```
-
-Crie um repositório vazio chamado `boston-housing-kmeans` no GitHub e substitua `<usuario>` abaixo:
-
-```bash
-git remote add origin https://github.com/<usuario>/boston-housing-kmeans.git
-```
-
-```bash
-git push -u origin main
-```

@@ -89,7 +89,12 @@ def run_k_analysis(
     k_max: int = K_MAX,
     n_bootstrap: int = N_BOOTSTRAP,
 ) -> pd.DataFrame:
-    """Avalia cada K: inércia, Silhouette (K >= 2), tamanhos e estabilidade."""
+    """Avalia cada K: inércia, distância média, Silhouette (K >= 2), tamanhos e estabilidade.
+
+    A inércia é a soma dos quadrados das distâncias euclidianas de cada registro ao seu
+    centroide; a distância média é a média dessas distâncias, sem elevar ao quadrado. As
+    duas curvas recebem o mesmo cálculo geométrico de cotovelo.
+    """
     k_max = min(k_max, len(X) - 1)
     if k_max <= k_min:
         raise ValueError("A base não tem registros suficientes para avaliar a faixa de K.")
@@ -98,9 +103,11 @@ def run_k_analysis(
     for k in range(k_min, k_max + 1):
         model = make_kmeans(k).fit(X)
         sizes = np.bincount(model.labels_, minlength=k)
+        point_distances = np.linalg.norm(X - model.cluster_centers_[model.labels_], axis=1)
         row: dict[str, Any] = {
             "k": k,
             "inercia": model.inertia_,
+            "distancia_media_ao_centroide": point_distances.mean(),
             "silhouette": np.nan,
             "menor_cluster_n": int(sizes.min()),
             "menor_cluster_pct": 100 * sizes.min() / len(X),
@@ -123,6 +130,10 @@ def run_k_analysis(
     results.insert(3, "inercia_explicada_pct", 100 * (1 - results["inercia"] / total_inertia))
     _, distances = find_elbow(results["k"].to_numpy(), results["inercia"].to_numpy())
     results.insert(4, "distancia_cotovelo", distances)
+    _, mean_distances = find_elbow(
+        results["k"].to_numpy(), results["distancia_media_ao_centroide"].to_numpy()
+    )
+    results.insert(6, "distancia_cotovelo_dist_media", mean_distances)
     return results
 
 
@@ -192,11 +203,23 @@ def select_k(results: pd.DataFrame, k_override: int | None = None) -> dict[str, 
     if k_override is not None:
         if k_override not in set(evaluated["k"]):
             raise ValueError(f"K deve estar entre os valores avaliados: {sorted(evaluated['k'])}")
-        selected, criterion = k_override, "decisão do responsável (FINAL_K ou --k)"
+        selected = k_override
+        # Um K fixado que coincide com a regra registra o critério da regra, e não uma escolha
+        # arbitrária; qualquer outro K fica identificado como decisão do responsável.
+        if k_override == rule_k:
+            criterion = f"{rule_criterion} (confirmado em FINAL_K ou --k)"
+        else:
+            criterion = "decisão do responsável (FINAL_K ou --k)"
     elif rule_k is not None:
         selected, criterion = rule_k, rule_criterion
     else:
         raise ValueError(f"Nenhum K mantém todos os clusters acima de {MIN_CLUSTER_PCT}%.")
+
+    mean_distance_elbow_k = None
+    if "distancia_media_ao_centroide" in results:
+        mean_distance_elbow_k, _ = find_elbow(
+            results["k"].to_numpy(), results["distancia_media_ao_centroide"].to_numpy()
+        )
 
     silhouette_rank = evaluated["silhouette"].rank(ascending=False, method="min")
     selected_row = evaluated[evaluated["k"] == selected].iloc[0]
@@ -205,6 +228,7 @@ def select_k(results: pd.DataFrame, k_override: int | None = None) -> dict[str, 
         "criterio": criterion,
         "k_regra_automatica": rule_k,
         "k_cotovelo_geometrico": elbow_k,
+        "k_cotovelo_distancia_media": mean_distance_elbow_k,
         "k_maior_silhouette": best_silhouette_k,
         "indicadores_divergem": elbow_k != best_silhouette_k,
         "posicao_silhouette_do_k_selecionado": int(silhouette_rank[selected_row.name]),
@@ -345,16 +369,21 @@ def feature_influence(
     return pd.DataFrame(rows).sort_values("pct_soma_quadrados_entre", ascending=False)
 
 
-def plot_elbow(results: pd.DataFrame, selection: dict[str, Any], path: Path) -> None:
-    """Curva de inércia com a reta entre extremos e o K selecionado."""
-    selected = selection["k_selecionado"]
+def _plot_elbow_curve(
+    ax: plt.Axes,
+    results: pd.DataFrame,
+    column: str,
+    label: str,
+    selected: int,
+    elbow: int,
+    value_format: str,
+) -> None:
+    """Desenha uma curva do cotovelo, a reta entre extremos, o K selecionado e o cotovelo."""
     point = results[results["k"] == selected].iloc[0]
     ends = results.iloc[[0, -1]]
-
-    fig, ax = plt.subplots(figsize=(9, 5.2))
     ax.plot(
         ends["k"],
-        ends["inercia"],
+        ends[column],
         linestyle="--",
         linewidth=1.3,
         color=COLORS["muted"],
@@ -362,29 +391,31 @@ def plot_elbow(results: pd.DataFrame, selection: dict[str, Any], path: Path) -> 
     )
     ax.plot(
         results["k"],
-        results["inercia"],
+        results[column],
         marker="o",
         markersize=6,
         linewidth=2,
         color=COLORS["primary"],
-        label="Inércia",
+        label=label,
     )
     ax.axvline(selected, linestyle=":", linewidth=1.2, color=COLORS["accent"])
+    selected_label = f"K selecionado = {selected}"
+    if elbow == selected:
+        selected_label += " (cotovelo geométrico)"
     ax.scatter(
         [selected],
-        [point["inercia"]],
+        [point[column]],
         s=130,
         color=COLORS["accent"],
         edgecolor=COLORS["surface"],
         linewidth=2,
         zorder=5,
-        label=f"K selecionado = {selected}",
+        label=selected_label,
     )
-    elbow = selection["k_cotovelo_geometrico"]
     if elbow != selected:
         ax.scatter(
             [elbow],
-            results.loc[results["k"] == elbow, "inercia"],
+            results.loc[results["k"] == elbow, column],
             s=110,
             facecolor=COLORS["surface"],
             edgecolor=COLORS["primary"],
@@ -393,17 +424,37 @@ def plot_elbow(results: pd.DataFrame, selection: dict[str, Any], path: Path) -> 
             label=f"Cotovelo geométrico = {elbow}",
         )
     ax.annotate(
-        f"K = {selected}\ninércia = {point['inercia']:.1f}",
-        (selected, point["inercia"]),
+        f"K = {selected}\n{label.lower()} = {point[column]:{value_format}}",
+        (selected, point[column]),
         xytext=(12, 14),
         textcoords="offset points",
         color=COLORS["ink_secondary"],
     )
     ax.set_xticks(results["k"])
     ax.set_xlabel("Quantidade de clusters (K)")
-    ax.set_ylabel("Inércia")
-    ax.set_title("Método do cotovelo: inércia por quantidade de clusters")
+    ax.set_ylabel(label)
     ax.legend(loc="upper right")
+
+
+def plot_elbow(results: pd.DataFrame, selection: dict[str, Any], path: Path) -> None:
+    """Curvas do cotovelo pela inércia e pela distância média ao centroide."""
+    selected = selection["k_selecionado"]
+    fig, (left, right) = plt.subplots(1, 2, figsize=(15, 5.4))
+    _plot_elbow_curve(
+        left, results, "inercia", "Inércia", selected, selection["k_cotovelo_geometrico"], ".1f"
+    )
+    left.set_title("Inércia (soma dos quadrados das distâncias)")
+    _plot_elbow_curve(
+        right,
+        results,
+        "distancia_media_ao_centroide",
+        "Distância média",
+        selected,
+        selection["k_cotovelo_distancia_media"],
+        ".3f",
+    )
+    right.set_title("Distância média dos registros ao centroide")
+    fig.suptitle("Método do cotovelo por quantidade de clusters", fontweight="semibold")
     fig.tight_layout()
     fig.savefig(path, dpi=150)
     plt.close(fig)
@@ -594,7 +645,8 @@ def print_summary(summary: dict[str, Any], model_path: Path) -> None:
     print(f"Registros utilizados: {metadata['n_registros_treinamento']}")
     print(f"K selecionado: {metadata['k']} ({selection['criterio']})")
     print(f"K pela regra automática: {selection['k_regra_automatica']}")
-    print(f"K pelo cotovelo geométrico: {selection['k_cotovelo_geometrico']}")
+    print(f"K pelo cotovelo geométrico (inércia): {selection['k_cotovelo_geometrico']}")
+    print(f"K pelo cotovelo geométrico (distância média): {selection['k_cotovelo_distancia_media']}")
     print(f"K com maior Silhouette: {selection['k_maior_silhouette']}")
     if selection["indicadores_divergem"]:
         print("Atenção: cotovelo e Silhouette divergem. Consulte a justificativa no README.")

@@ -68,10 +68,11 @@ K_MAX = 10
 # Menor participação aceitável de um cluster na seleção automática de K, em %.
 MIN_CLUSTER_PCT = 5.0
 
-# Decisão final do responsável pelo projeto, justificada no README. A regra automática
-# continua sendo calculada e registrada em reports/k_selection.json. Use None para que
-# ela volte a definir K, por exemplo ao treinar com outra versão da base.
-FINAL_K: int | None = 2
+# K oficial: o cotovelo geométrico da faixa K_MIN a K_MAX, que é o critério principal do
+# projeto. Nesta base, a inércia e a distância média ao centroide apontam K = 3. A análise
+# completa fica em reports/k_selection.json e no README. Use None para que a regra
+# automática volte a definir K, por exemplo ao treinar com outra versão da base.
+FINAL_K: int | None = 3
 
 # Reamostragens usadas para medir a estabilidade de cada K.
 N_BOOTSTRAP = 50

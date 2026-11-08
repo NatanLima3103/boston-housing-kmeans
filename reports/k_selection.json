@@ -1,11 +1,12 @@
 {
-  "k_selecionado": 2,
-  "criterio": "decisão do responsável (FINAL_K ou --k)",
+  "k_selecionado": 3,
+  "criterio": "cotovelo geométrico com tamanho mínimo de cluster atendido (confirmado em FINAL_K ou --k)",
   "k_regra_automatica": 3,
   "k_cotovelo_geometrico": 3,
+  "k_cotovelo_distancia_media": 3,
   "k_maior_silhouette": 2,
   "indicadores_divergem": true,
-  "posicao_silhouette_do_k_selecionado": 1,
+  "posicao_silhouette_do_k_selecionado": 4,
   "tamanho_minimo_de_cluster_pct": 5.0,
   "cotovelo_por_faixa_de_k": {
     "1-6": 2,

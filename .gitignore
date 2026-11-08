@@ -20,10 +20,11 @@ build/
 dist/
 *.egg-info/
 
-# Base de dados: sem confirmação de redistribuição, fica fora do repositório.
-# A pasta é preservada pelo .gitkeep. Veja "Base de dados" no README.
+# Base de dados: somente HousingData.csv, fornecida para a atividade, é versionada.
+# Outros arquivos colocados em data/ (cópias, extrações, temporários) ficam fora do Git.
 data/*
 !data/.gitkeep
+!data/HousingData.csv
 
 # Treinamentos experimentais (K diferente de FINAL_K): regeneráveis com --k.
 experiments/

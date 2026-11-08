@@ -340,6 +340,18 @@ def test_run_k_analysis_reports_all_k(synthetic_df):
     assert results.loc[1:, "silhouette"].notna().all()
     assert results.loc[0, "inercia_explicada_pct"] == pytest.approx(0)
     assert results.loc[results["silhouette"].idxmax(), "k"] == K_SYNTHETIC
+    assert results["distancia_media_ao_centroide"].is_monotonic_decreasing
+    assert results[["distancia_cotovelo", "distancia_cotovelo_dist_media"]].notna().all().all()
+
+
+def test_mean_distance_is_mean_of_unsquared_distances(synthetic_df):
+    X = build_preprocessor().fit_transform(select_features(synthetic_df))
+    results = run_k_analysis(X, k_min=1, k_max=4, n_bootstrap=0)
+    for k, expected in zip(results["k"], results["distancia_media_ao_centroide"]):
+        model = make_kmeans(k).fit(X)
+        distances = np.linalg.norm(X - model.cluster_centers_[model.labels_], axis=1)
+        assert expected == pytest.approx(distances.mean())
+        assert results.loc[results["k"] == k, "inercia"].iloc[0] == pytest.approx((distances**2).sum())
 
 
 def _analysis_table(smallest_pct: dict[int, float]) -> pd.DataFrame:
@@ -376,6 +388,12 @@ def test_select_k_override_is_recorded_and_validated():
     assert selection["k_regra_automatica"] == 3
     with pytest.raises(ValueError):
         select_k(table, k_override=1)
+
+
+def test_select_k_override_matching_rule_keeps_rule_criterion():
+    selection = select_k(_analysis_table({2: 40, 3: 20, 4: 10, 5: 8}), k_override=3)
+    assert selection["k_selecionado"] == 3
+    assert selection["criterio"].startswith("cotovelo geométrico")
 
 
 def test_elbow_sensitivity_covers_alternative_ranges():
@@ -970,6 +988,17 @@ def test_cli_experimental_k_never_targets_official_outputs(monkeypatch):
     assert received["reports_dir"] == expected_dir / "reports"
     assert received["model_path"] == expected_dir / "kmeans_model.joblib"
     assert received["reports_dir"] != REPORTS_DIR and received["model_path"] != MODEL_PATH
+
+
+@needs_real_data
+def test_final_k_is_the_elbow_of_the_real_dataset():
+    """FINAL_K deve ser o cotovelo geométrico da base real, pela inércia e pela distância média."""
+    X = build_preprocessor().fit_transform(select_features(load_dataset(DATA_PATH)))
+    results = run_k_analysis(X, n_bootstrap=0)
+    selection = select_k(results, k_override=FINAL_K)
+    assert selection["k_cotovelo_geometrico"] == FINAL_K
+    assert selection["k_cotovelo_distancia_media"] == FINAL_K
+    assert selection["criterio"].startswith("cotovelo geométrico")
 
 
 @needs_real_data
